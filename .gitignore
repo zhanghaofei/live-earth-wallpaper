@@ -203,3 +203,7 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# pyinstaller
+himawaripy/exe
+himawaripy/wallpaper

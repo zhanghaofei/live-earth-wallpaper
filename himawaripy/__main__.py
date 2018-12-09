@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-
 import argparse
-from datetime import timedelta, datetime
 import io
 import itertools as it
 import json
@@ -9,26 +7,30 @@ import multiprocessing as mp
 import multiprocessing.dummy as mp_dummy
 import os
 import os.path as path
+import subprocess
 import sys
-from time import strptime, strftime, mktime
-import urllib.request
-from glob import iglob, glob
 import threading
 import time
-import subprocess
+import urllib.request
+from datetime import timedelta, datetime
+from glob import iglob, glob
+from time import strptime, strftime, mktime
+
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 
 import appdirs
 from PIL import Image
 from dateutil.tz import tzlocal
-
-from .utils import set_background, get_desktop_environment
-
+from utils import set_background, get_desktop_environment
 
 # Semantic Versioning: Major, Minor, Patch
 HIMAWARIPY_VERSION = (2, 0, 1)
 counter = None
 HEIGHT = 550
 WIDTH = 550
+LATEST_JSON = ''
 
 
 def calculate_time_offset(latest_date, auto, preferred_offset):
@@ -93,9 +95,10 @@ def parse_args():
                         help="deadline in minutes to download all the tiles, set 0 to cancel")
     parser.add_argument("--save-battery", action="store_true", dest="save_battery", default=False,
                         help="stop refreshing on battery")
+    default_output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wallpaper')
     parser.add_argument("--output-dir", type=str, dest="output_dir",
                         help="directory to save the temporary background image",
-                        default=appdirs.user_cache_dir(appname="himawaripy", appauthor=False))
+                        default=default_output_dir)
 
     args = parser.parse_args()
 
@@ -145,6 +148,7 @@ def download(url):
 
 def thread_main(args):
     global counter
+    global LATEST_JSON
     counter = mp.Value("i", 0)
 
     level = args.level  # since we are going to use it a lot of times
@@ -154,6 +158,12 @@ def thread_main(args):
     latest = strptime(json.loads(latest_json.decode("utf-8"))["date"], "%Y-%m-%d %H:%M:%S")
 
     print("Latest version: {} GMT.".format(strftime("%Y/%m/%d %H:%M:%S", latest)))
+
+    if latest_json == LATEST_JSON:
+        print('Skip...')
+        return
+    LATEST_JSON = latest_json
+
     requested_time = calculate_time_offset(latest, args.auto_offset, args.offset)
     if args.auto_offset or args.offset != 10:
         print("Offset version: {} GMT.".format(strftime("%Y/%m/%d %H:%M:%S", requested_time)))
@@ -176,6 +186,8 @@ def thread_main(args):
     os.makedirs(path.dirname(output_file), exist_ok=True)
     png.save(output_file, "PNG")
 
+    if sys.platform == 'win32':
+        return
     if not set_background(output_file):
         sys.exit("Your desktop environment '{}' is not supported!\n".format(get_desktop_environment()))
 
@@ -195,9 +207,15 @@ def main():
     if args.deadline and main_thread.is_alive():
         sys.exit("Timeout!\n")
 
-    print()
-    sys.exit(0)
+
+def run():
+    scheduler = BlockingScheduler()
+    scheduler.add_job(main, trigger=IntervalTrigger(minutes=1), next_run_time=datetime.now())
+    try:
+        scheduler.start()
+    except KeyboardInterrupt:
+        sys.exit('Quit!\n')
 
 
 if __name__ == "__main__":
-    main()
+    run()
