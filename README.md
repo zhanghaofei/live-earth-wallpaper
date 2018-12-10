@@ -1,5 +1,5 @@
-# himawaripy
-*Put near-realtime picture of Earth as your desktop background*
+# Live Earth Wallpaper
+*把地球实时图片作为桌面背景*
 
 ![24 hours long animation by /u/hardypart](https://i.giphy.com/l3vRnMYNnbhdnz5Ty.gif)
 ![24 hours long animation by /u/hardypart](screenshot.png)
